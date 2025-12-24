@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Árbol de Navidad 3D</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #0a1128, #1a2332);
+            font-family: Arial, sans-serif;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+
+        .title {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #ffd700;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        button {
+            background: #2d5016;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            margin: 5px 0;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        button:hover {
+            background: #3d6826;
+        }
+
+        .music-btn {
+            background: #c41e3a;
+        }
+
+        .music-btn:hover {
+            background: #d63447;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-label {
+            background: #c41e3a;
+            color: white;
+            padding: 8px 15px;
+            margin: 5px 0;
+            border-radius: 5px;
+            cursor: pointer;
+            display: block;
+            text-align: center;
+        }
+
+        .file-label:hover {
+            background: #d63447;
+        }
+
+        .music-info {
+            font-size: 11px;
+            color: #aaa;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">🎄 ¡Feliz Navidad! 🎄</div>
+    <div class="controls">
+        <div><strong>Controles:</strong></div>
+        <div>Arrastra para rotar</div>
+        <div>Scroll para acercar</div>
+        <button id="toggleSnow">Activar/Desactivar Nieve</button>
+        
+        <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.3);">
+            <strong>🎵 Música:</strong>
+            <div id="musicInfo" class="music-info">Cargando música...</div>
+            <button id="toggleMusic" class="music-btn">▶️ Reproducir</button>
+        </div>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let rotationY = 0;
+        let rotationX = 0;
+        let autoRotate = true;
+        let zoom = 1;
+        let isDragging = false;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+        let snowEnabled = true;
+        let audio = null;
+
+        // Cargar música automáticamente desde la carpeta musica/
+        function loadMusic() {
+            // Cambia 'navidad.mp3' por el nombre de tu archivo de música
+            const musicPath = 'musica/music.mp4';
+            
+            audio = new Audio(musicPath);
+            audio.loop = true;
+            audio.volume = 0.5;
+            
+            audio.addEventListener('canplaythrough', () => {
+                document.getElementById('musicInfo').textContent = 'Música lista: navidad.mp3';
+            });
+            
+            audio.addEventListener('error', () => {
+                document.getElementById('musicInfo').textContent = '⚠️ No se pudo cargar la música';
+                document.getElementById('musicInfo').style.color = '#ff6b6b';
+            });
+        }
+
+        // Inicializar música al cargar la página
+        loadMusic();
+
+        // Partículas de nieve
+        const snowflakes = [];
+        for (let i = 0; i < 100; i++) {
+            snowflakes.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                radius: Math.random() * 3 + 1,
+                speed: Math.random() * 1 + 0.5,
+                drift: Math.random() * 0.5 - 0.25
+            });
+        }
+
+        // Luces del árbol
+        const lights = [];
+        const lightColors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffffff'];
+        
+        function createTreeLights() {
+            lights.length = 0;
+            for (let i = 0; i < 50; i++) {
+                lights.push({
+                    angle: Math.random() * Math.PI * 2,
+                    height: Math.random(),
+                    color: lightColors[Math.floor(Math.random() * lightColors.length)],
+                    phase: Math.random() * Math.PI * 2,
+                    speed: Math.random() * 2 + 1
+                });
+            }
+        }
+
+        createTreeLights();
+
+        function project3D(x, y, z) {
+            const scale = 200 * zoom;
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+
+            // Rotación Y
+            let x1 = x * Math.cos(rotationY) - z * Math.sin(rotationY);
+            let z1 = x * Math.sin(rotationY) + z * Math.cos(rotationY);
+
+            // Rotación X
+            let y1 = y * Math.cos(rotationX) - z1 * Math.sin(rotationX);
+            let z2 = y * Math.sin(rotationX) + z1 * Math.cos(rotationX);
+
+            const perspective = 500 / (500 + z2);
+            
+            return {
+                x: cx + x1 * scale * perspective,
+                y: cy + y1 * scale * perspective,
+                z: z2,
+                scale: perspective
+            };
+        }
+
+        function drawTree() {
+            const segments = 8;
+            const layers = 12;
+            
+            for (let layer = 0; layer < layers; layer++) {
+                const heightRatio = layer / layers;
+                const radius = 1.5 * (1 - heightRatio);
+                // Invertir el árbol: y va de 2 hacia abajo hasta -2
+                const y = 2 - heightRatio * 4;
+                
+                const vertices = [];
+                for (let i = 0; i <= segments; i++) {
+                    const angle = (i / segments) * Math.PI * 2;
+                    const x = Math.cos(angle) * radius;
+                    const z = Math.sin(angle) * radius;
+                    vertices.push(project3D(x, y, z));
+                }
+
+                ctx.fillStyle = `rgb(${45 + layer * 10}, ${80 + layer * 5}, ${22})`;
+                ctx.beginPath();
+                ctx.moveTo(vertices[0].x, vertices[0].y);
+                for (let i = 1; i < vertices.length; i++) {
+                    ctx.lineTo(vertices[i].x, vertices[i].y);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.stroke();
+            }
+        }
+
+        function drawLights(time) {
+            lights.forEach(light => {
+                const radius = 1.5 * (1 - light.height);
+                // Invertir la altura del árbol para las luces
+                const y = 2 - light.height * 4;
+                const x = Math.cos(light.angle) * radius;
+                const z = Math.sin(light.angle) * radius;
+                
+                const pos = project3D(x, y, z);
+                const brightness = (Math.sin(time * 0.001 * light.speed + light.phase) + 1) / 2;
+                
+                ctx.fillStyle = light.color;
+                ctx.globalAlpha = 0.3 + brightness * 0.7;
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 5 * pos.scale, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.globalAlpha = 0.2;
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 12 * pos.scale, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            });
+        }
+
+        function drawStar(time) {
+            // La estrella se queda fija sin animación
+            const starTop = project3D(0, -2.5, 0);
+            ctx.fillStyle = '#FFD700';
+            ctx.strokeStyle = '#FFA500';
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            for (let i = 0; i < 5; i++) {
+                const angle = (i * 4 * Math.PI / 5) - Math.PI / 2;
+                const radius = i % 2 === 0 ? 20 : 20;
+                const x = starTop.x + Math.cos(angle) * radius;
+                const y = starTop.y + Math.sin(angle) * radius;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        function drawSnow() {
+            if (!snowEnabled) return;
+            
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            snowflakes.forEach(flake => {
+                ctx.beginPath();
+                ctx.arc(flake.x, flake.y, flake.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                flake.y += flake.speed;
+                flake.x += flake.drift;
+                
+                if (flake.y > canvas.height) {
+                    flake.y = 0;
+                    flake.x = Math.random() * canvas.width;
+                }
+                if (flake.x > canvas.width) flake.x = 0;
+                if (flake.x < 0) flake.x = canvas.width;
+            });
+        }
+
+        function animate(time) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (autoRotate) {
+                rotationY += 0.01;
+            }
+            
+            drawTree();
+            drawLights(time);
+            drawStar(time);
+            drawSnow();
+            
+            requestAnimationFrame(animate);
+        }
+
+        // Event listeners
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            autoRotate = false;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const deltaX = e.clientX - lastMouseX;
+                const deltaY = e.clientY - lastMouseY;
+                rotationY += deltaX * 0.01;
+                rotationX += deltaY * 0.01;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+            setTimeout(() => { autoRotate = true; }, 1000);
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            zoom += e.deltaY * -0.001;
+            zoom = Math.min(Math.max(0.5, zoom), 2);
+        });
+
+        document.getElementById('toggleSnow').addEventListener('click', () => {
+            snowEnabled = !snowEnabled;
+        });
+
+        // Reproducir/pausar música
+        document.getElementById('toggleMusic').addEventListener('click', () => {
+            if (!audio) return;
+            
+            const btn = document.getElementById('toggleMusic');
+            if (audio.paused) {
+                audio.play();
+                btn.textContent = '⏸️ Pausar';
+            } else {
+                audio.pause();
+                btn.textContent = '▶️ Reproducir';
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        animate(0);
+    </script>
+</body>
+</html>
