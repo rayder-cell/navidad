@@ -161,8 +161,7 @@
     <div class="title">🎄 ¡Feliz Navidad! 🎄</div>
     <div class="controls">
         <div><strong>Controles:</strong></div>
-        <div>Arrastra para rotar</div>
-        <div>Scroll para acercar</div>
+        <div>Mueva con los dedos</div>
     </div>
     
     <div class="music-control">
@@ -209,7 +208,7 @@
             audio.volume = 0.5;
             
             audio.addEventListener('canplaythrough', () => {
-                document.getElementById('musicInfo').textContent = 'Música lista: navidad.mp3';
+                document.getElementById('musicInfo').textContent = 'Música:';
             });
             
             audio.addEventListener('error', () => {
