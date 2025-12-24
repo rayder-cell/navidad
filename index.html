@@ -11,10 +11,15 @@
             overflow: hidden;
             background: linear-gradient(to bottom, #0a1128, #1a2332);
             font-family: Arial, sans-serif;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         canvas {
             display: block;
+            touch-action: none;
         }
 
         .controls {
@@ -22,10 +27,26 @@
             top: 20px;
             left: 20px;
             color: white;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 15px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
             border-radius: 10px;
-            font-size: 14px;
+            font-size: 12px;
+            max-width: 200px;
+            z-index: 1000;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                font-size: 11px;
+                padding: 8px;
+                max-width: 150px;
+            }
+            
+            .title {
+                font-size: 18px !important;
+                right: 10px !important;
+                top: 10px !important;
+            }
         }
 
         .title {
@@ -333,6 +354,58 @@
             setTimeout(() => { autoRotate = true; }, 1000);
         });
 
+        // Touch events para móviles
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isDragging = true;
+            autoRotate = false;
+            const touch = e.touches[0];
+            lastMouseX = touch.clientX;
+            lastMouseY = touch.clientY;
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (isDragging) {
+                const touch = e.touches[0];
+                const deltaX = touch.clientX - lastMouseX;
+                const deltaY = touch.clientY - lastMouseY;
+                rotationY += deltaX * 0.01;
+                rotationX += deltaY * 0.01;
+                lastMouseX = touch.clientX;
+                lastMouseY = touch.clientY;
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            isDragging = false;
+            setTimeout(() => { autoRotate = true; }, 1000);
+        }, { passive: false });
+
+        // Pinch zoom para móviles
+        let initialDistance = 0;
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                initialDistance = Math.sqrt(dx * dx + dy * dy);
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const delta = (distance - initialDistance) * 0.01;
+                zoom += delta;
+                zoom = Math.min(Math.max(0.5, zoom), 2);
+                initialDistance = distance;
+            }
+        }, { passive: false });
+
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
             zoom += e.deltaY * -0.001;
@@ -360,6 +433,18 @@
         window.addEventListener('resize', () => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            
+            // Recrear copos de nieve con el nuevo tamaño
+            snowflakes.length = 0;
+            for (let i = 0; i < 100; i++) {
+                snowflakes.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: Math.random() * 3 + 1,
+                    speed: Math.random() * 1 + 0.5,
+                    drift: Math.random() * 0.5 - 0.25
+                });
+            }
         });
 
         animate(0);
