@@ -130,6 +130,31 @@
             color: #aaa;
             margin-top: 5px;
         }
+
+        .footer {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #aaa;
+            font-size: 12px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 15px;
+            border-radius: 5px;
+        }
+
+        .footer p {
+            margin: 0;
+        }
+
+        @media (max-width: 768px) {
+            .footer {
+                font-size: 10px;
+                bottom: 10px;
+                padding: 3px 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -149,6 +174,10 @@
     
     <div class="snow-control">
         <button id="toggleSnow">❄️ Activar/Desactivar Nieve</button>
+    </div>
+    
+    <div class="footer">
+        <p>@2025 Rayder Derechos reservados</p>
     </div>
     
     <canvas id="canvas"></canvas>
